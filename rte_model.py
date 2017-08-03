@@ -36,7 +36,9 @@ class RTE(nn.Module):
 		self.register_parameter('W_r', self.W_r)
 		self.W_alpha = nn.Parameter(torch.randn(self.n_dim, 1).cuda()) if use_cuda else  nn.Parameter(torch.randn(self.n_dim, 1)) # n_dim x 1
 		self.register_parameter('W_alpha', self.W_alpha)
-
+		if self.options['WBW_ATTN']:
+			self.W_t = nn.Parameter(torch.randn(self.n_dim, self.n_dim).cuda()) if use_cuda else nn.Parameter(torch.randn(self.n_dim, self.n_dim)) # n_dim x n_dim
+			self.register_parameter('W_t', self.W_t)
 		# Final combination Parameters
 		self.W_x = nn.Parameter(torch.randn(self.n_dim , self.n_dim).cuda()) if use_cuda else  nn.Parameter(torch.randn(self.n_dim , self.n_dim)) # n_dim x n_dim
 		self.register_parameter('W_x', self.W_x)
@@ -46,6 +48,10 @@ class RTE(nn.Module):
 	def init_hidden(self, batch_size):
 		hidden_p = Variable(torch.zeros(1, batch_size, self.n_dim).type(dtype))		
 		return hidden_p
+
+	def attn_rnn_init_hidden(self, batch_size): 
+		r_0 = Variable(torch.zeros(batch_size, self.n_dim).type(dtype))
+		return r_0
 
 	def _gru_forward(self, gru, encoded_s, mask_s, h_0):
 		'''
@@ -132,6 +138,41 @@ class RTE(nn.Module):
 
 		return h_star
 
+	def _attn_rnn_forward(self, o_h, mask_h, r_0, o_p, mask_p):
+		'''
+		inputs:
+			o_h : T x batch x n_dim : The hypothesis
+			mask_h : T x batch
+			r_0 : batch x n_dim : 
+			o_p : T x batch x n_dim : The premise. Will attend on it at every step
+			mask_p : T x batch : the mask for the premise
+		params:
+			W_t : n_dim x n_dim
+		outputs:
+			r : batch x n_dim : the last state of the rnn
+			alpha_vec : T x batch x T the attn vec at every step
+		'''
+		seq_len_h = o_h.size(0)
+		batch_size = o_h.size(1)
+		seq_len_p = o_p.size(0)
+		alpha_vec = Variable(torch.zeros(seq_len_h, batch_size, seq_len_p).type(dtype))
+		r_tm1 = r_0
+		for ix,(r_t,mask_t) in enumerate(zip(o_h, mask_h)):
+			'''
+				r_t : batch x n_dim
+				mask_t : batch,
+			'''
+			attn_r_tm1, alpha = self._attention_forward(o_p, mask_p, r_tm1) # attn_r_tm1 : batch x n_dim
+																			# alpha : batch x T
+			alpha_vec[ix] = alpha
+			w_r_t = torch.mm(r_t, self.W_t) # batch x n_dim
+			r_t = attn_r_tm1 + F.tanh(w_r_t) # batch x n_dim			
+			mask_t = mask_t.unsqueeze(1)
+			r_t = (mask_t.expand(*r_t.size()) * r_t) + ((1. - mask_t.expand(*r_t.size())) * (r_tm1))
+			r_tm1 = r_t
+
+		return r_t, alpha_vec
+
 
 	def forward(self, premise, hypothesis, training = False):
 		'''
@@ -161,12 +202,16 @@ class RTE(nn.Module):
 		h_0 = self.init_hidden(batch_size) # 1 x batch x n_dim
 		o_p, h_n = self._gru_forward(self.p_gru, encoded_p, mask_p, h_0) # o_p : T x batch x n_dim
 															 # h_n : 1 x batch x n_dim
-
+		
 		o_h,h_n = self._gru_forward(self.h_gru, encoded_h, mask_h, h_n) # o_h : T x batch x n_dim
 															# h_n : 1 x batch x n_dim
 
-
-		r, alpha = self._attention_forward(o_p, mask_p, o_h[-1]) # r : batch x n_dim
+		if self.options['WBW_ATTN']:			
+			r_0 = self.attn_rnn_init_hidden(batch_size) # batch x n_dim
+			r, alpha_vec = self._attn_rnn_forward(o_h, mask_h, r_0, o_p, mask_p) # r : batch x n_dim
+																		# alpha_vec : T x batch x T			
+		else:
+			r, alpha = self._attention_forward(o_p, mask_p, o_h[-1]) # r : batch x n_dim
 																 # alpha : batch x T
 
 		h_star = self._combine_last(r, o_h[-1]) # batch x n_dim

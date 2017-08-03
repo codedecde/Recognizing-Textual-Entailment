@@ -20,6 +20,7 @@ def get_arguments():
 		args_value = False if args_value == "false" else True
 		setattr(args, attr_name, args_value)
 		return args
+	
 	parser = argparse.ArgumentParser(description='Recognizing Textual Entailment')
 	parser.add_argument('-n_embed', action="store", default=300, dest="embedding_dim", type=int)
 	parser.add_argument('-n_dim', action="store", default=300, dest="hidden_dim", type=int)
@@ -30,13 +31,15 @@ def get_arguments():
 	# Using strings as a proxy for boolean flags. Checks happen later
 	parser.add_argument('-last_nonlinear', action="store", default = "false", dest="last_nonlinear", type=str)
 	parser.add_argument('-train_flag', action="store", default = "true", dest="train_flag", type=str)
-	parser.add_argument('-continue_training', action="store", default = "true", dest="continue_training", type=str)	
+	parser.add_argument('-continue_training', action="store", default = "false", dest="continue_training", type=str)	
+	parser.add_argument('-wbw_attn', action="store", default = "false", dest="wbw_attn", type=str)
 
 	args = parser.parse_args(sys.argv[1:])
 	# Checks for the boolean flags
 	args = check_boolean(args, 'last_nonlinear')
 	args = check_boolean(args, 'train_flag')
 	args = check_boolean(args, 'continue_training')
+	args = check_boolean(args, 'wbw_attn')
 
 	return args
 
@@ -45,26 +48,35 @@ def get_options(args):
 	# MISC
 	options['CLASSES_2_IX'] = {'neutral':1, 'contradiction':2, 'entailment' : 0}
 	options['VOCAB'] = ROOT_DIR + 'data/vocab.pkl'
-	options['TRAIN_FILE'] = ROOT_DIR + 'data/train.txt'
-	options['VAL_FILE'] = ROOT_DIR + 'data/dev.txt'
-	options['TEST_FILE'] = ROOT_DIR + 'data/test.txt'
+	# options['TRAIN_FILE'] = ROOT_DIR + 'data/train.txt'
+	# options['VAL_FILE'] = ROOT_DIR + 'data/dev.txt'
+	# options['TEST_FILE'] = ROOT_DIR + 'data/test.txt'
+
+	options['TRAIN_FILE'] = ROOT_DIR + 'data/tinyTrain.txt'
+	options['VAL_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
+	options['TEST_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
+
 	# Network Properties
-	options['EMBEDDING_DIM'] = args.embedding_dim if hasattr(args, 'embedding_dim') else 300
-	options['HIDDEN_DIM']    = args.hidden_dim    if hasattr(args, 'hidden_dim')    else 300
-	options['BATCH_SIZE']    = args.batch_size    if hasattr(args, 'batch_size')    else 256
-	options['DROPOUT']       = args.dropout       if hasattr(args, 'dropout')       else 0.1
-	options['L2']            = args.l2            if hasattr(args, 'l2')            else 0.0003
-	options['LR']            = args.lr            if hasattr(args, 'lr')            else 0.001
 	options['LAST_NON_LINEAR'] = args.last_nonlinear if hasattr(args, 'last_nonlinear') else False
+	options['EMBEDDING_DIM']   = args.embedding_dim  if hasattr(args, 'embedding_dim')  else 300
+	options['HIDDEN_DIM']      = args.hidden_dim     if hasattr(args, 'hidden_dim')     else 300
+	options['BATCH_SIZE']      = args.batch_size     if hasattr(args, 'batch_size')     else 256
+	options['DROPOUT']         = args.dropout        if hasattr(args, 'dropout')        else 0.1
+	options['L2']              = args.l2             if hasattr(args, 'l2')             else 0.0003
+	options['LR']              = args.lr             if hasattr(args, 'lr')             else 0.001
+	options['WBW_ATTN']        = args.wbw_attn       if hasattr(args, 'wbw_attn')       else False
 	# Build the save string 
-	options['SAVE_PREFIX'] = ROOT_DIR + 'models/model'
+	if options['WBW_ATTN']:
+		options['SAVE_PREFIX'] = ROOT_DIR + 'models_wbw/model'
+	else:
+		options['SAVE_PREFIX'] = ROOT_DIR + 'models/model'
 	options['SAVE_PREFIX'] += '_EMBEDDING_DIM_%d'%(options['EMBEDDING_DIM'])
 	options['SAVE_PREFIX'] += '_HIDDEN_DIM_%d'%(options['HIDDEN_DIM'])
 	options['SAVE_PREFIX'] += '_DROPOUT_%.4f'%(options['DROPOUT'])
 	options['SAVE_PREFIX'] += '_L2_%.4f'%(options['L2'])
 	options['SAVE_PREFIX'] += '_LR_%.4f'%(options['LR'])
-	options['SAVE_PREFIX'] += '_LAST_NON_LINEAR_%s'%(str(options['LAST_NON_LINEAR']))
-
+	options['SAVE_PREFIX'] += '_LAST_NON_LINEAR_%s'%(str(options['LAST_NON_LINEAR']))	
+	
 	options['TRAIN_FLAG']   = args.train_flag     if hasattr(args, 'train_flag')     else True
 	options['CONTINUE_TRAINING'] = args.continue_training if hasattr(args, 'continue_training') else True
 	
@@ -99,6 +111,7 @@ rte_model = RTE(l_en, options)
 if options['TRAIN_FLAG']:	
 	print "MODEL PROPERTIES:\n\tEMBEDDING_DIM : %d\n\tHIDDEN_DIM : %d"%(options['EMBEDDING_DIM'], options['HIDDEN_DIM'])
 	print "\tDROPOUT : %.4f\n\tL2 : %.4f\n\tLR : %.4f\n\tLAST_NON_LINEAR : %s"%(options['DROPOUT'], options['L2'], options['LR'], str(options['LAST_NON_LINEAR']))
+	print "\tWBW ATTN : %s"%(str(options['WBW_ATTN']))
 	print 'LOADING DATA ...'
 	X_train,y_train = data_generator(options['TRAIN_FILE'], l_en)
 	X_val, y_val = data_generator(options['VAL_FILE'], l_en)
@@ -107,8 +120,8 @@ if options['TRAIN_FLAG']:
 		best_model_file = get_best_model_file(options['SAVE_PREFIX'], model_suffix='.model')
 		best_model_state = torch.load(best_model_file)
 		rte_model.load_state_dict(best_model_state)
-	rte_model.fit(X_train,y_train, X_val, y_val, n_epochs = 20)
-else:
+	rte_model.fit(X_train,y_train, X_val, y_val, n_epochs = 5)
+else:	
 	best_model_file = get_best_model_file(options['SAVE_PREFIX'],model_suffix='.model')
 	best_model_state = torch.load(best_model_file)
 	
