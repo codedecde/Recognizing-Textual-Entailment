@@ -25,8 +25,8 @@ class RTE(nn.Module):
 		self.embedding = nn.Embedding(len(l_en) +1, self.n_embed).type(dtype)
 		if self.options['USE_PRETRAINED']:
 			embedding_matrix = self.l_en.get_embedding_matrix()
-			if embedding_matrix is not None:		
-				print 'EMBEDDING MATRIX SIZE (%d,%d)'%(embedding_matrix.shape[0], embedding_matrix.shape[1])		
+			if embedding_matrix is not None:				
+				print 'EMBEDDING MATRIX SIZE (%d,%d)'%(embedding_matrix.shape[0], embedding_matrix.shape[1])
 				self.embedding.weight = nn.Parameter(torch.Tensor(embedding_matrix).type(dtype))
 
 		self.p_gru = nn.GRU(self.n_embed, self.n_dim, bidirectional = False).type(dtype)
@@ -96,14 +96,15 @@ class RTE(nn.Module):
 
 
 
-	def _attention_forward(self, Y, mask_Y, h):
+	def _attention_forward(self, Y, mask_Y, h, r_tm1 = None):
 		'''
-		Computes the Attention Weights over Y using h
+		Computes the Attention Weights over Y using h (and r_tm1 if given)
 		Returns an attention weighted representation of Y, and the alphas 
 		inputs: 
 			Y : T x batch x n_dim
 			mask_Y : T x batch
 			h : batch x n_dim
+			r_tm1 : batch x n_dim
 		params:
 			W_y : n_dim x n_dim
 			W_h : n_dim x n_dim
@@ -118,12 +119,17 @@ class RTE(nn.Module):
 
 		Wy = torch.bmm( Y , self.W_y.unsqueeze(0).expand(Y.size(0), *self.W_y.size() ) ) # batch x T x n_dim
 		Wh = torch.mm( h, self.W_h ) # batch x n_dim
-
+		if r_tm1 is not None:
+			W_r_tm1 = torch.mm(r_tm1, self.W_r)
+			Wh += W_r_tm1
 		M = torch.tanh( Wy +  Wh.unsqueeze(1).expand(Wh.size(0), Y.size(1), Wh.size(1)) )# batch x T x n_dim        
 		alpha = torch.bmm(M, self.W_alpha.unsqueeze(0).expand(Y.size(0), *self.W_alpha.size())).squeeze(-1) # batch x T
 		alpha = alpha + (-1000.0 * (1. - mask_Y) ) # To ensure probability mass doesn't fall on non tokens
 		alpha = F.softmax(alpha)
-		r = torch.bmm(alpha.unsqueeze(1), Y).squeeze(1) # batch x n_dim
+		if r_tm1 is not None:
+			r = torch.bmm(alpha.unsqueeze(1), Y).squeeze(1) + F.tanh(torch.mm(r_tm1, self.W_t))# batch x n_dim
+		else:
+			r = torch.bmm(alpha.unsqueeze(1), Y).squeeze(1) # batch x n_dim
 		return r, alpha
 
 	def _combine_last(self, r, h_t):
@@ -163,16 +169,14 @@ class RTE(nn.Module):
 		seq_len_p = o_p.size(0)
 		alpha_vec = Variable(torch.zeros(seq_len_h, batch_size, seq_len_p).type(dtype))
 		r_tm1 = r_0
-		for ix,(r_t,mask_t) in enumerate(zip(o_h, mask_h)):
+		for ix,(h_t,mask_t) in enumerate(zip(o_h, mask_h)):
 			'''
-				r_t : batch x n_dim
+				h_t : batch x n_dim				
 				mask_t : batch,
 			'''
-			attn_r_tm1, alpha = self._attention_forward(o_p, mask_p, r_tm1) # attn_r_tm1 : batch x n_dim
+			r_t, alpha = self._attention_forward(o_p, mask_p, h_t, r_tm1)   # r_t : batch x n_dim
 																			# alpha : batch x T
-			alpha_vec[ix] = alpha
-			w_r_t = torch.mm(r_t, self.W_t) # batch x n_dim
-			r_t = attn_r_tm1 + F.tanh(w_r_t) # batch x n_dim			
+			alpha_vec[ix] = alpha			
 			mask_t = mask_t.unsqueeze(1) # batch x 1
 			r_t = (mask_t.expand(*r_t.size()) * r_t) + ((1. - mask_t.expand(*r_t.size())) * (r_tm1))
 			r_tm1 = r_t
@@ -339,11 +343,11 @@ class RTE(nn.Module):
 					y_true = [self.options['CLASSES_2_IX'][w] for w in y_val]						
 					val_acc = accuracy_score(y_true, y_pred)
 					bar.update(step + 1, values = [('train_loss',loss), ('train_acc',acc), ('val_acc', val_acc)])
-					if best_val_acc is None or val_acc == max(val_acc, best_val_acc):
-						best_val_acc = val_acc
-						model_name = '_epoch_%d_val_acc_%.4f.model'%(epoch+1, val_acc)
-						model_name = save_prefix + model_name
-						torch.save(self.state_dict(), model_name)					
+					# if best_val_acc is None or val_acc == max(val_acc, best_val_acc):
+					# 	best_val_acc = val_acc
+					# 	model_name = '_epoch_%d_val_acc_%.4f.model'%(epoch+1, val_acc)
+					# 	model_name = save_prefix + model_name
+					# 	torch.save(self.state_dict(), model_name)					
 
 
 

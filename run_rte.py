@@ -125,7 +125,7 @@ if options['TRAIN_FLAG']:
 		best_model_file = get_best_model_file(options['SAVE_PREFIX'], model_suffix='.model')
 		best_model_state = torch.load(best_model_file)
 		rte_model.load_state_dict(best_model_state)
-	rte_model.fit(X_train,y_train, X_val, y_val, n_epochs = 5)
+	rte_model.fit(X_train,y_train, X_val, y_val, n_epochs = 200)
 else:	
 	best_model_file = get_best_model_file(options['SAVE_PREFIX'],model_suffix='.model')
 	best_model_state = torch.load(best_model_file)
