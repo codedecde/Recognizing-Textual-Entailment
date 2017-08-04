@@ -22,8 +22,8 @@ def get_arguments():
 		return args
 	
 	parser = argparse.ArgumentParser(description='Recognizing Textual Entailment')
-	parser.add_argument('-n_embed', action="store", default=300, dest="embedding_dim", type=int)
-	parser.add_argument('-n_dim', action="store", default=300, dest="hidden_dim", type=int)
+	parser.add_argument('-n_embed', action="store", default=300, dest="n_embed", type=int)
+	parser.add_argument('-n_dim', action="store", default=300, dest="n_dim", type=int)
 	parser.add_argument('-batch', action="store", default=256, dest="batch_size", type=int)
 	parser.add_argument('-dropout', action="store", default=0.1, dest="dropout", type=float)
 	parser.add_argument('-l2', action="store", default=0.0003, dest="l2", type=float)
@@ -33,14 +33,14 @@ def get_arguments():
 	parser.add_argument('-train_flag', action="store", default = "true", dest="train_flag", type=str)
 	parser.add_argument('-continue_training', action="store", default = "false", dest="continue_training", type=str)	
 	parser.add_argument('-wbw_attn', action="store", default = "false", dest="wbw_attn", type=str)
-
+	parser.add_argument('-use_pretrained', action="store", default = "false", dest="use_pretrained", type=str)
 	args = parser.parse_args(sys.argv[1:])
 	# Checks for the boolean flags
 	args = check_boolean(args, 'last_nonlinear')
 	args = check_boolean(args, 'train_flag')
 	args = check_boolean(args, 'continue_training')
 	args = check_boolean(args, 'wbw_attn')
-
+	args = check_boolean(args, 'use_pretrained')
 	return args
 
 def get_options(args):
@@ -58,18 +58,23 @@ def get_options(args):
 
 	# Network Properties
 	options['LAST_NON_LINEAR'] = args.last_nonlinear if hasattr(args, 'last_nonlinear') else False
-	options['EMBEDDING_DIM']   = args.embedding_dim  if hasattr(args, 'embedding_dim')  else 300
-	options['HIDDEN_DIM']      = args.hidden_dim     if hasattr(args, 'hidden_dim')     else 300
+	options['USE_PRETRAINED']  = args.use_pretrained if hasattr(args, 'use_pretrained') else False
 	options['BATCH_SIZE']      = args.batch_size     if hasattr(args, 'batch_size')     else 256
 	options['DROPOUT']         = args.dropout        if hasattr(args, 'dropout')        else 0.1
+	options['EMBEDDING_DIM']   = args.n_embed        if hasattr(args, 'n_embed')        else 300
+	options['HIDDEN_DIM']      = args.n_dim          if hasattr(args, 'n_dim')          else 300
 	options['L2']              = args.l2             if hasattr(args, 'l2')             else 0.0003
 	options['LR']              = args.lr             if hasattr(args, 'lr')             else 0.001
 	options['WBW_ATTN']        = args.wbw_attn       if hasattr(args, 'wbw_attn')       else False
+	
 	# Build the save string 
 	if options['WBW_ATTN']:
 		options['SAVE_PREFIX'] = ROOT_DIR + 'models_wbw/model'
 	else:
 		options['SAVE_PREFIX'] = ROOT_DIR + 'models/model'
+	if options['USE_PRETRAINED']:
+		options['SAVE_PREFIX'] += '_USING_PRETRAINED_EMBEDDINGS'
+	
 	options['SAVE_PREFIX'] += '_EMBEDDING_DIM_%d'%(options['EMBEDDING_DIM'])
 	options['SAVE_PREFIX'] += '_HIDDEN_DIM_%d'%(options['HIDDEN_DIM'])
 	options['SAVE_PREFIX'] += '_DROPOUT_%.4f'%(options['DROPOUT'])
@@ -111,7 +116,7 @@ rte_model = RTE(l_en, options)
 if options['TRAIN_FLAG']:	
 	print "MODEL PROPERTIES:\n\tEMBEDDING_DIM : %d\n\tHIDDEN_DIM : %d"%(options['EMBEDDING_DIM'], options['HIDDEN_DIM'])
 	print "\tDROPOUT : %.4f\n\tL2 : %.4f\n\tLR : %.4f\n\tLAST_NON_LINEAR : %s"%(options['DROPOUT'], options['L2'], options['LR'], str(options['LAST_NON_LINEAR']))
-	print "\tWBW ATTN : %s"%(str(options['WBW_ATTN']))
+	print "\tWBW ATTN : %s\n\tUSING PRETRAINED EMBEDDINGS : %s"%(str(options['WBW_ATTN']), str(options['USE_PRETRAINED']))
 	print 'LOADING DATA ...'
 	X_train,y_train = data_generator(options['TRAIN_FILE'], l_en)
 	X_val, y_val = data_generator(options['VAL_FILE'], l_en)

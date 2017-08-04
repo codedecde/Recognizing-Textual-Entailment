@@ -23,6 +23,12 @@ class RTE(nn.Module):
 		self.n_dim = options['HIDDEN_DIM'] if options['HIDDEN_DIM'] % 2 == 0 else options['HIDDEN_DIM'] - 1
 		self.n_out = len(options['CLASSES_2_IX'])
 		self.embedding = nn.Embedding(len(l_en) +1, self.n_embed).type(dtype)
+		if self.options['USE_PRETRAINED']:
+			embedding_matrix = self.l_en.get_embedding_matrix()
+			if embedding_matrix is not None:		
+				print 'EMBEDDING MATRIX SIZE (%d,%d)'%(embedding_matrix.shape[0], embedding_matrix.shape[1])		
+				self.embedding.weight = nn.Parameter(torch.Tensor(embedding_matrix).type(dtype))
+
 		self.p_gru = nn.GRU(self.n_embed, self.n_dim, bidirectional = False).type(dtype)
 		self.h_gru = nn.GRU(self.n_embed, self.n_dim, bidirectional = False).type(dtype)
 		self.out = nn.Linear(self.n_dim, self.n_out).type(dtype)
@@ -167,7 +173,7 @@ class RTE(nn.Module):
 			alpha_vec[ix] = alpha
 			w_r_t = torch.mm(r_t, self.W_t) # batch x n_dim
 			r_t = attn_r_tm1 + F.tanh(w_r_t) # batch x n_dim			
-			mask_t = mask_t.unsqueeze(1)
+			mask_t = mask_t.unsqueeze(1) # batch x 1
 			r_t = (mask_t.expand(*r_t.size()) * r_t) + ((1. - mask_t.expand(*r_t.size())) * (r_tm1))
 			r_tm1 = r_t
 
