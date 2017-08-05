@@ -2,6 +2,13 @@ import numpy as np
 import time
 import sys
 import os
+import pdb
+import random
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import matplotlib.cm as cm
 '''
     Utility functions
     Taken from keras code : https://keras.io/
@@ -226,4 +233,29 @@ def get_best_model_file(file_prefix, mode = "max", model_suffix = '.weights'):
     print 'LOADING WEIGHTS FROM : %s '%(best_model_file)    
     sys.stdout.flush()
     return directory + '/' + best_model_file
+
+
+def visualize_attention_single(X, model, filename, k=None):
+    '''
+        X : [([premise words], [hypothesis words])]
+        model : The Deep Learning Model
+        k : if int, then randomly samples k examples from X to show, else shows all examples from X
+    '''
+    indices = range(0,len(X)) if k is None else random.sample(range(0, len(X)), k)
+    display_data = [X[ix] for ix in indices]    
+    display_premise, display_hypothesis = [list(x) for x in zip(*display_data)]
+    _, alpha = model.predict(display_data,1, probs = False, return_attn = True)
+    fig = plt.figure()    
+    matplotlib.rcParams['xtick.labelsize'] = 8
+    matplotlib.rcParams['axes.titlesize'] = 8
+    for i in xrange(len(display_premise)):
+        ax = fig.add_subplot(len(display_premise), 1, i+1)        
+        cax = ax.matshow(alpha[i], cmap=cm.OrRd, vmin=0, vmax=1)        
+        ax.xaxis.tick_bottom()        
+        ax.xaxis.set_label_position('bottom')        
+        ax.set_xticklabels([''] + display_premise[i], rotation=90)        
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1))            
+        ax.set_title('Hypothesis : ' + ' '.join(display_hypothesis[i]), va='bottom')        
+    plt.savefig(filename)
+
 

@@ -34,6 +34,8 @@ def get_arguments():
 	parser.add_argument('-continue_training', action="store", default = "false", dest="continue_training", type=str)	
 	parser.add_argument('-wbw_attn', action="store", default = "false", dest="wbw_attn", type=str)
 	parser.add_argument('-use_pretrained', action="store", default = "false", dest="use_pretrained", type=str)
+	parser.add_argument('-debug', action="store", default = "false", dest="debug", type=str)
+	parser.add_argument('-see_attn', action="store", default = "false", dest="see_attn", type=str)
 	args = parser.parse_args(sys.argv[1:])
 	# Checks for the boolean flags
 	args = check_boolean(args, 'last_nonlinear')
@@ -41,20 +43,25 @@ def get_arguments():
 	args = check_boolean(args, 'continue_training')
 	args = check_boolean(args, 'wbw_attn')
 	args = check_boolean(args, 'use_pretrained')
+	args = check_boolean(args, 'debug')
+	args = check_boolean(args, 'see_attn')
 	return args
 
 def get_options(args):
 	options = {}
 	# MISC
+	options['DEBUG'] = args.debug if hasattr(args, 'debug') else False
 	options['CLASSES_2_IX'] = {'neutral':1, 'contradiction':2, 'entailment' : 0}
 	options['VOCAB'] = ROOT_DIR + 'data/vocab.pkl'
-	# options['TRAIN_FILE'] = ROOT_DIR + 'data/train.txt'
-	# options['VAL_FILE'] = ROOT_DIR + 'data/dev.txt'
-	# options['TEST_FILE'] = ROOT_DIR + 'data/test.txt'
+	if options['DEBUG']:
+		options['TRAIN_FILE'] = ROOT_DIR + 'data/tinyTrain.txt'
+		options['VAL_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
+		options['TEST_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
+	else:
+		options['TRAIN_FILE'] = ROOT_DIR + 'data/train.txt'
+		options['VAL_FILE'] = ROOT_DIR + 'data/dev.txt'
+		options['TEST_FILE'] = ROOT_DIR + 'data/test.txt'
 
-	options['TRAIN_FILE'] = ROOT_DIR + 'data/tinyTrain.txt'
-	options['VAL_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
-	options['TEST_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
 
 	# Network Properties
 	options['LAST_NON_LINEAR'] = args.last_nonlinear if hasattr(args, 'last_nonlinear') else False
@@ -82,9 +89,10 @@ def get_options(args):
 	options['SAVE_PREFIX'] += '_LR_%.4f'%(options['LR'])
 	options['SAVE_PREFIX'] += '_LAST_NON_LINEAR_%s'%(str(options['LAST_NON_LINEAR']))	
 	
-	options['TRAIN_FLAG']   = args.train_flag     if hasattr(args, 'train_flag')     else True
+	options['TRAIN_FLAG']        = args.train_flag        if hasattr(args, 'train_flag')        else True
+	options['SEE_ATTN']          = args.see_attn          if hasattr(args, 'see_attn')          else False
 	options['CONTINUE_TRAINING'] = args.continue_training if hasattr(args, 'continue_training') else True
-	
+
 	return options
 
 args = get_arguments()
@@ -125,13 +133,22 @@ if options['TRAIN_FLAG']:
 		best_model_file = get_best_model_file(options['SAVE_PREFIX'], model_suffix='.model')
 		best_model_state = torch.load(best_model_file)
 		rte_model.load_state_dict(best_model_state)
-	rte_model.fit(X_train,y_train, X_val, y_val, n_epochs = 200)
+	if options['DEBUG']:
+		rte_model.fit(X_train, y_train, X_val, y_val, steps_epoch = 100, n_epochs = 20)
+	else:
+		rte_model.fit(X_train,y_train, X_val, y_val, n_epochs = 200)
 else:	
 	best_model_file = get_best_model_file(options['SAVE_PREFIX'],model_suffix='.model')
 	best_model_state = torch.load(best_model_file)
 	
 	rte_model.load_state_dict(best_model_state)
-	X_test, y_test = data_generator(options['TEST_FILE'], l_en)
-	preds_test = rte_model.predict(X_test, options['BATCH_SIZE'], probs = False)
-	test_acc = accuracy_score([options['CLASSES_2_IX'][w] for w in y_test], preds_test)
-	print "TEST ACCURACY FROM BEST MODEL : %.4f" %(test_acc)
+	if options['SEE_ATTN']:
+		X_test, y_test = data_generator(options['TEST_FILE'], l_en)
+		for ix, elem in enumerate(X_test):
+			filename = 'Attention_fig_' + str(ix+1)  + '.png'
+			visualize_attention_single([X_test[ix]], rte_model, filename)
+	else:
+		X_test, y_test = data_generator(options['TEST_FILE'], l_en)
+		preds_test = rte_model.predict(X_test, options['BATCH_SIZE'], probs = False)
+		test_acc = accuracy_score([options['CLASSES_2_IX'][w] for w in y_test], preds_test)
+		print "TEST ACCURACY FROM BEST MODEL : %.4f" %(test_acc)

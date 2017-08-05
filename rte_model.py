@@ -188,7 +188,7 @@ class RTE(nn.Module):
 		return r_t, alpha_vec
 
 
-	def forward(self, premise, hypothesis, training = False):
+	def forward(self, premise, hypothesis, training = False, return_attn = False):
 		'''
 		inputs:
 			premise : batch x T 
@@ -225,15 +225,18 @@ class RTE(nn.Module):
 			r, alpha_vec = self._attn_rnn_forward(o_h, mask_h, r_0, o_p, mask_p) # r : batch x n_dim
 																		# alpha_vec : T x batch x T			
 		else:
-			r, alpha = self._attention_forward(o_p, mask_p, o_h[-1]) # r : batch x n_dim
-																 # alpha : batch x T
+			r, alpha_vec = self._attention_forward(o_p, mask_p, o_h[-1]) # r : batch x n_dim
+																 # alpha_vec : batch x T
 
 		h_star = self._combine_last(r, o_h[-1]) # batch x n_dim
 		h_star = self.out(h_star) # batch x num_classes
 		if self.options['LAST_NON_LINEAR']:
 			h_star = F.leaky_relu(h_star) # Non linear projection
 		pred = F.log_softmax(h_star)		
-		return pred
+		if return_attn:
+			return pred, alpha_vec
+		else:
+			return pred
 	
 	def _get_numpy_array_from_variable(self, variable):
 		'''
@@ -296,15 +299,32 @@ class RTE(nn.Module):
 			return p_vec, h_vec
 
 
-	def predict(self, X, batch_size = None, probs = False):
+	def predict(self, X, batch_size = None, probs = False, return_attn = False):
 		batch_size = self.options['BATCH_SIZE'] if batch_size is None else batch_size		
 		preds = None
 		pred_probs = None
-		
+		ret_attn = []
 		for ix in xrange(0, len(X), batch_size):
 			p_batch, h_batch = self.process_batch(X[ix : ix + batch_size])
-			
-			preds_batch = self.__call__(p_batch, h_batch)			
+			if return_attn == False:
+				preds_batch = self.__call__(p_batch, h_batch)
+			else:
+				preds_batch, attn_vec = self.__call__(p_batch, h_batch, return_attn= True)
+				attn_vec = self._get_numpy_array_from_variable(attn_vec)
+				if self.options['WBW_ATTN']:
+					'''
+						attn_vec : T_hypothesis x batch x T_premise
+					'''
+					for ix in xrange(attn_vec.shape[1]):
+						ret_attn.append(attn_vec[:,ix,:])
+				else:
+					'''
+						attn_vec : batch x T_premise
+					'''
+					for ix in xrange(attn_vec.shape[0]):
+						ret_attn.append(attn_vec[ix].reshape(1,attn_vec.shape[-1]))
+					
+
 			_ , preds_ix = torch.max(preds_batch, dim=-1)
 			preds_ix = self._get_numpy_array_from_variable(preds_ix)
 			preds_batch = self._get_numpy_array_from_variable(preds_batch) 			
@@ -318,11 +338,11 @@ class RTE(nn.Module):
 					pred_probs = np.concatenate([pred_probs, preds_batch], axis=0)
 				else:					
 					preds = np.concatenate([preds, preds_ix], axis=0)
-		if probs:			
-			pred_probs = np.exp(pred_probs)
-			return pred_probs
-		else:			
-			return preds  
+		
+		ret_value_probs = np.exp(pred_probs) if probs else preds
+		ret_value = (ret_value_probs, ret_attn) if return_attn else ret_value_probs
+		return ret_value 
+		
 
 	def fit(self, X_train,y_train, X_val, y_val, save_prefix = None, batch_size = None, n_epochs = 20, steps_epoch = None ):
 		batch_size = self.options['BATCH_SIZE'] if batch_size is None else batch_size
@@ -347,11 +367,12 @@ class RTE(nn.Module):
 					y_true = [self.options['CLASSES_2_IX'][w] for w in y_val]						
 					val_acc = accuracy_score(y_true, y_pred)
 					bar.update(step + 1, values = [('train_loss',loss), ('train_acc',acc), ('val_acc', val_acc)])
-					if best_val_acc is None or val_acc == max(val_acc, best_val_acc):
-						best_val_acc = val_acc
-						model_name = '_epoch_%d_val_acc_%.4f.model'%(epoch+1, val_acc)
-						model_name = save_prefix + model_name
-						torch.save(self.state_dict(), model_name)
+					if 'DEBUG' not in self.options or self.options['DEBUG'] == False:
+						if best_val_acc is None or val_acc == max(val_acc, best_val_acc):
+							best_val_acc = val_acc
+							model_name = '_epoch_%d_val_acc_%.4f.model'%(epoch+1, val_acc)
+							model_name = save_prefix + model_name
+							torch.save(self.state_dict(), model_name)
 
 
 
