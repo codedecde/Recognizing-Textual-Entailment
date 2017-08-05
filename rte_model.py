@@ -43,7 +43,11 @@ class RTE(nn.Module):
 		self.W_alpha = nn.Parameter(torch.randn(self.n_dim, 1).cuda()) if use_cuda else  nn.Parameter(torch.randn(self.n_dim, 1)) # n_dim x 1
 		self.register_parameter('W_alpha', self.W_alpha)
 		if self.options['WBW_ATTN']:
-			self.W_t = nn.Parameter(torch.randn(self.n_dim, self.n_dim).cuda()) if use_cuda else nn.Parameter(torch.randn(self.n_dim, self.n_dim)) # n_dim x n_dim
+			# Since the word by word attention layer is a simple rnn, it suffers from the gradient exploding problem
+			# A way to circumvent that is having orthonormal initialization of the weight matrix
+			_W_t = np.random.randn(self.n_dim, self.n_dim)
+			_W_t_ortho, _ = np.linalg.qr(_W_t)
+			self.W_t = nn.Parameter(torch.Tensor(_W_t_ortho).cuda()) if use_cuda else nn.Parameter(torch.Tensor(_W_t_ortho)) # n_dim x n_dim
 			self.register_parameter('W_t', self.W_t)
 		# Final combination Parameters
 		self.W_x = nn.Parameter(torch.randn(self.n_dim , self.n_dim).cuda()) if use_cuda else  nn.Parameter(torch.randn(self.n_dim , self.n_dim)) # n_dim x n_dim
@@ -343,11 +347,11 @@ class RTE(nn.Module):
 					y_true = [self.options['CLASSES_2_IX'][w] for w in y_val]						
 					val_acc = accuracy_score(y_true, y_pred)
 					bar.update(step + 1, values = [('train_loss',loss), ('train_acc',acc), ('val_acc', val_acc)])
-					# if best_val_acc is None or val_acc == max(val_acc, best_val_acc):
-					# 	best_val_acc = val_acc
-					# 	model_name = '_epoch_%d_val_acc_%.4f.model'%(epoch+1, val_acc)
-					# 	model_name = save_prefix + model_name
-					# 	torch.save(self.state_dict(), model_name)					
+					if best_val_acc is None or val_acc == max(val_acc, best_val_acc):
+						best_val_acc = val_acc
+						model_name = '_epoch_%d_val_acc_%.4f.model'%(epoch+1, val_acc)
+						model_name = save_prefix + model_name
+						torch.save(self.state_dict(), model_name)
 
 
 
