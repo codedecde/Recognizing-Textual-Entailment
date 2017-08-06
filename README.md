@@ -6,9 +6,9 @@ A pyTorch implementation of models used for Recognizing Textual Entailment using
 * Learning Natural Language Inference with LSTM ( [Wang & Jiang '15](http://www.aclweb.org/anthology/N16-1170))
 
 The details and results specific to the different models are given below
-### Reasoning About Entailment with Neural Attention
+## Reasoning About Entailment with Neural Attention
 ---------------------
-#### Introduction
+### Introduction
 ----------------------------
 The paper presents an LSTM based model with attention for the task. The following are some key points:
 
@@ -41,7 +41,7 @@ Model specific arguments
     -h_maxlen    (Maximum Length of hypothesis(used by the recurrent batchnorm layer), default 30)
 
 
-#### Implementation Caveats
+### Implementation Caveats
 --------------------------
 
 The word by word attention model is basically a simple RNN, used to attend over the premise at every step. Consequently, it faces the exploding gradient problem. In order to prevent that from happening, the following measures have been taken:
@@ -49,7 +49,7 @@ The word by word attention model is basically a simple RNN, used to attend over 
 * Setting the initial weights of the RNN to be orthogonal
 * Using Batch Normalisation in Recurrent Networks, as done in Recurrent Batch Normalisation [Cooijmans et. al. '17](https://arxiv.org/pdf/1603.09025.pdf) [see **recurrent_BatchNorm.py** for implementation.]
 
-#### Results 
+### Results 
 ---------------------------
 
 
