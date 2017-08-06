@@ -199,6 +199,7 @@ class RTE(nn.Module):
 		outputs : 
 			pred : batch x num_classes
 		'''
+		self.train(training)
 		batch_size = premise.size(0)
 		
 		mask_p = torch.ne(premise,0).type(dtype)
