@@ -33,10 +33,10 @@ General arguments (used by other models as well)
     -dropout     (p value for dropout layer, default 0.1)
     -l2          (L2 regularisation value, default 0.0003)
     -lr          (Learning rate, default 0.001 )
-    -last_nonlinear	(Projection to softmax layer is non-linear or not, default False)
     -train_flag  (Training or evaluation mode, default True)
 Model specific arguments    
 	
+    -last_nonlinear	(Projection to softmax layer is non-linear or not, default False)
 	-wbw_attn    (Use word by word attention, default False)
     -h_maxlen    (Maximum Length of hypothesis(used by the recurrent batchnorm layer), default 30)
 
