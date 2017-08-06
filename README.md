@@ -29,10 +29,10 @@ General arguments (used by other models as well)
 
     -n_embed     (Embedding Layer Dimensions, default 300)
     -n_dim       (Hidden Layer Dimensions, default 300)
-    -batch	     (batch size, default 256)
+    -batch       (batch size, default 256)
     -dropout	 (p value for dropout layer, default 0.1)
-    -l2			 (L2 regularisation value, default 0.0003)
-    -lr		     (Learning rate, default 0.001 )
+    -l2          (L2 regularisation value, default 0.0003)
+    -lr          (Learning rate, default 0.001 )
     -last_nonlinear	(Projection to softmax layer is non-linear or not, default False)
     -train_flag  (Training or evaluation mode, default True)
 Model specific arguments    
