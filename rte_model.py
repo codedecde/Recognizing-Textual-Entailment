@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import Lang as L
 from utils import *
 import pdb
-
+from recurrent_BatchNorm import recurrent_BatchNorm
 from sklearn.metrics import accuracy_score
 
 use_cuda = torch.cuda.is_available()
@@ -49,8 +49,10 @@ class RTE(nn.Module):
 			_W_t_ortho, _ = np.linalg.qr(_W_t)
 			self.W_t = nn.Parameter(torch.Tensor(_W_t_ortho).cuda()) if use_cuda else nn.Parameter(torch.Tensor(_W_t_ortho)) # n_dim x n_dim
 			self.register_parameter('W_t', self.W_t)
-			self.batch_norm_h_r = nn.BatchNorm1d(self.n_dim).type(dtype)
-			self.batch_norm_r_r = nn.BatchNorm1d(self.n_dim).type(dtype)
+			self.batch_norm_h_r = recurrent_BatchNorm(self.n_dim, self.options['MAX_LEN']).type(dtype)
+			self.batch_norm_r_r = recurrent_BatchNorm(self.n_dim, self.options['MAX_LEN']).type(dtype)
+			# self.batch_norm_h_r = nn.BatchNorm1d(self.n_dim).type(dtype)
+			# self.batch_norm_r_r = nn.BatchNorm1d(self.n_dim).type(dtype)			
 		# Final combination Parameters
 		self.W_x = nn.Parameter(torch.randn(self.n_dim , self.n_dim).cuda()) if use_cuda else  nn.Parameter(torch.randn(self.n_dim , self.n_dim)) # n_dim x n_dim
 		self.register_parameter('W_x', self.W_x)
@@ -102,7 +104,7 @@ class RTE(nn.Module):
 
 
 
-	def _attention_forward(self, Y, mask_Y, h, r_tm1 = None):
+	def _attention_forward(self, Y, mask_Y, h, r_tm1 = None, index = None):
 		'''
 		Computes the Attention Weights over Y using h (and r_tm1 if given)
 		Returns an attention weighted representation of Y, and the alphas 
@@ -111,6 +113,7 @@ class RTE(nn.Module):
 			mask_Y : T x batch
 			h : batch x n_dim
 			r_tm1 : batch x n_dim
+			index : int : The timestep
 		params:
 			W_y : n_dim x n_dim
 			W_h : n_dim x n_dim
@@ -126,8 +129,8 @@ class RTE(nn.Module):
 		Wy = torch.bmm( Y , self.W_y.unsqueeze(0).expand(Y.size(0), *self.W_y.size() ) ) # batch x T x n_dim
 		Wh = torch.mm( h, self.W_h ) # batch x n_dim
 		if r_tm1 is not None:
-			W_r_tm1 = self.batch_norm_r_r(torch.mm(r_tm1, self.W_r))
-			Wh = self.batch_norm_h_r(Wh)
+			W_r_tm1 = self.batch_norm_r_r(torch.mm(r_tm1, self.W_r), index) if hasattr(self, 'batch_norm_r_r') else torch.mm(r_tm1, self.W_r)
+			Wh = self.batch_norm_h_r(Wh, index) if hasattr(self, 'batch_norm_h_r') else Wh
 			Wh += W_r_tm1
 		M = torch.tanh( Wy +  Wh.unsqueeze(1).expand(Wh.size(0), Y.size(1), Wh.size(1)) )# batch x T x n_dim        
 		alpha = torch.bmm(M, self.W_alpha.unsqueeze(0).expand(Y.size(0), *self.W_alpha.size())).squeeze(-1) # batch x T
@@ -181,7 +184,7 @@ class RTE(nn.Module):
 				h_t : batch x n_dim				
 				mask_t : batch,
 			'''
-			r_t, alpha = self._attention_forward(o_p, mask_p, h_t, r_tm1)   # r_t : batch x n_dim
+			r_t, alpha = self._attention_forward(o_p, mask_p, h_t, r_tm1, ix)   # r_t : batch x n_dim
 																			# alpha : batch x T
 			alpha_vec[ix] = alpha			
 			mask_t = mask_t.unsqueeze(1) # batch x 1
