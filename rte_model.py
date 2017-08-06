@@ -347,11 +347,12 @@ class RTE(nn.Module):
 					y_true = [self.options['CLASSES_2_IX'][w] for w in y_val]						
 					val_acc = accuracy_score(y_true, y_pred)
 					bar.update(step + 1, values = [('train_loss',loss), ('train_acc',acc), ('val_acc', val_acc)])
-					if best_val_acc is None or val_acc == max(val_acc, best_val_acc):
-						best_val_acc = val_acc
-						model_name = '_epoch_%d_val_acc_%.4f.model'%(epoch+1, val_acc)
-						model_name = save_prefix + model_name
-						torch.save(self.state_dict(), model_name)
+					if not 'DEBUG' in self.options or self.options['DEBUG'] == False:
+						if best_val_acc is None or val_acc == max(val_acc, best_val_acc):
+							best_val_acc = val_acc
+							model_name = '_epoch_%d_val_acc_%.4f.model'%(epoch+1, val_acc)
+							model_name = save_prefix + model_name
+							torch.save(self.state_dict(), model_name)
 
 
 

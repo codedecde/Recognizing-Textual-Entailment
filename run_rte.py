@@ -34,6 +34,7 @@ def get_arguments():
 	parser.add_argument('-continue_training', action="store", default = "false", dest="continue_training", type=str)	
 	parser.add_argument('-wbw_attn', action="store", default = "false", dest="wbw_attn", type=str)
 	parser.add_argument('-use_pretrained', action="store", default = "false", dest="use_pretrained", type=str)
+	parser.add_argument('-debug', action="store", default = "false", dest="debug", type=str)
 	args = parser.parse_args(sys.argv[1:])
 	# Checks for the boolean flags
 	args = check_boolean(args, 'last_nonlinear')
@@ -41,20 +42,24 @@ def get_arguments():
 	args = check_boolean(args, 'continue_training')
 	args = check_boolean(args, 'wbw_attn')
 	args = check_boolean(args, 'use_pretrained')
+	args = check_boolean(args, 'debug')
 	return args
 
 def get_options(args):
 	options = {}
 	# MISC
+	options['DEBUG'] = args.debug if hasattr(args, 'debug') else False
 	options['CLASSES_2_IX'] = {'neutral':1, 'contradiction':2, 'entailment' : 0}
 	options['VOCAB'] = ROOT_DIR + 'data/vocab.pkl'
-	# options['TRAIN_FILE'] = ROOT_DIR + 'data/train.txt'
-	# options['VAL_FILE'] = ROOT_DIR + 'data/dev.txt'
-	# options['TEST_FILE'] = ROOT_DIR + 'data/test.txt'
+	if options['DEBUG']:
+		options['TRAIN_FILE'] = ROOT_DIR + 'data/tinyTrain.txt'
+		options['VAL_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
+		options['TEST_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
+	else:
+		options['TRAIN_FILE'] = ROOT_DIR + 'data/train.txt'
+		options['VAL_FILE'] = ROOT_DIR + 'data/dev.txt'
+		options['TEST_FILE'] = ROOT_DIR + 'data/test.txt'
 
-	options['TRAIN_FILE'] = ROOT_DIR + 'data/tinyTrain.txt'
-	options['VAL_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
-	options['TEST_FILE'] = ROOT_DIR + 'data/tinyVal.txt'
 
 	# Network Properties
 	options['LAST_NON_LINEAR'] = args.last_nonlinear if hasattr(args, 'last_nonlinear') else False
