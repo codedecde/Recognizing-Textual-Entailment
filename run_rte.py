@@ -35,6 +35,7 @@ def get_arguments():
 	parser.add_argument('-wbw_attn', action="store", default = "false", dest="wbw_attn", type=str)
 	parser.add_argument('-use_pretrained', action="store", default = "false", dest="use_pretrained", type=str)
 	parser.add_argument('-debug', action="store", default = "false", dest="debug", type=str)
+	parser.add_argument('-h_maxlen', action="store", default = 30, dest="h_maxlen", type=int)
 	args = parser.parse_args(sys.argv[1:])
 	# Checks for the boolean flags
 	args = check_boolean(args, 'last_nonlinear')
@@ -65,6 +66,7 @@ def get_options(args):
 	options['LAST_NON_LINEAR'] = args.last_nonlinear if hasattr(args, 'last_nonlinear') else False
 	options['USE_PRETRAINED']  = args.use_pretrained if hasattr(args, 'use_pretrained') else False
 	options['BATCH_SIZE']      = args.batch_size     if hasattr(args, 'batch_size')     else 256
+	options['MAX_LEN']         = args.h_maxlen       if hasattr(args, 'h_maxlen')       else 30
 	options['DROPOUT']         = args.dropout        if hasattr(args, 'dropout')        else 0.1
 	options['EMBEDDING_DIM']   = args.n_embed        if hasattr(args, 'n_embed')        else 300
 	options['HIDDEN_DIM']      = args.n_dim          if hasattr(args, 'n_dim')          else 300
