@@ -50,9 +50,8 @@ class RTE(nn.Module):
 			self.W_t = nn.Parameter(torch.Tensor(_W_t_ortho).cuda()) if use_cuda else nn.Parameter(torch.Tensor(_W_t_ortho)) # n_dim x n_dim
 			self.register_parameter('W_t', self.W_t)
 			self.batch_norm_h_r = recurrent_BatchNorm(self.n_dim, self.options['MAX_LEN']).type(dtype)
-			self.batch_norm_r_r = recurrent_BatchNorm(self.n_dim, self.options['MAX_LEN']).type(dtype)
-			# self.batch_norm_h_r = nn.BatchNorm1d(self.n_dim).type(dtype)
-			# self.batch_norm_r_r = nn.BatchNorm1d(self.n_dim).type(dtype)			
+			self.batch_norm_r_r = recurrent_BatchNorm(self.n_dim, self.options['MAX_LEN']).type(dtype)			
+		
 		# Final combination Parameters
 		self.W_x = nn.Parameter(torch.randn(self.n_dim , self.n_dim).cuda()) if use_cuda else  nn.Parameter(torch.randn(self.n_dim , self.n_dim)) # n_dim x n_dim
 		self.register_parameter('W_x', self.W_x)
@@ -194,7 +193,7 @@ class RTE(nn.Module):
 				mask_t : batch,
 			'''
 			r_t, alpha = self._attention_forward(o_p, mask_p, h_t, r_tm1, ix)   # r_t : batch x n_dim
-																			# alpha : batch x T
+																			    # alpha : batch x T
 			alpha_vec[ix] = alpha			
 			mask_t = mask_t.unsqueeze(1) # batch x 1			
 			r_t = self.mask_mult(r_t, r_tm1, mask_t)

@@ -226,7 +226,6 @@ class mGRU(nn.Module):
 			return variable.data.numpy()
 
 	def fit_batch(self, premise_batch, hypothesis_batch, y_batch):
-		self.train(True)
 		if not hasattr(self,'criterion'):
 			self.criterion = nn.NLLLoss()
 		if not hasattr(self, 'optimizer'):
@@ -279,7 +278,6 @@ class mGRU(nn.Module):
 
 
 	def predict(self, X, batch_size = None, probs = False):
-		self.eval()
 		batch_size = self.options['BATCH_SIZE'] if batch_size is None else batch_size		
 		preds = None
 		pred_probs = None
