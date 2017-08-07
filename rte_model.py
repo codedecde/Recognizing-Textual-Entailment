@@ -66,6 +66,15 @@ class RTE(nn.Module):
 	def attn_rnn_init_hidden(self, batch_size): 
 		r_0 = Variable(torch.zeros(batch_size, self.n_dim).type(dtype))
 		return r_0
+	
+	def mask_mult(self, o_t, o_tm1, mask_t):
+		'''
+			o_t : batch x n
+			o_tm1 : batch x n
+			mask_t : batch x 1
+		'''		
+		# return (mask_t.expand(*o_t.size()) * o_t) + ((1. - mask_t.expand(*o_t.size())) * (o_tm1))
+		return (o_t * mask_t) + (o_tm1 * (1. - mask_t))
 
 	def _gru_forward(self, gru, encoded_s, mask_s, h_0):
 		'''
@@ -92,11 +101,11 @@ class RTE(nn.Module):
 			o_t, h_t = gru(x_t.unsqueeze(0), h_tm1.unsqueeze(0)) # o_t : 1 x batch x n_dim
 														 # h_t : 1 x batch x n_dim
 			mask_t = mask_t.unsqueeze(1) # batch x 1			
-			h_t = (mask_t.expand(*h_t[0].size()) * h_t[0]) + ((1. - mask_t.expand(*h_t[0].size())) * (h_tm1))
+			h_t = self.mask_mult(h_t[0], h_tm1, mask_t) # batch x n_dim
 						
 			if o_tm1 is not None:
-				o_t = (o_t[0] * mask_t.expand(*o_t[0].size())) + (o_tm1 * (1. - mask_t.expand(*o_t[0].size()))) # batch x n_dim
-			o_tm1 = o_t 
+				o_t = self.mask_mult(o_t[0], o_tm1, mask_t)
+			o_tm1 = o_t[0] if o_tm1 is None else o_t
 			h_tm1 = h_t
 			o_s[ix] = o_t
 		
@@ -187,8 +196,8 @@ class RTE(nn.Module):
 			r_t, alpha = self._attention_forward(o_p, mask_p, h_t, r_tm1, ix)   # r_t : batch x n_dim
 																			# alpha : batch x T
 			alpha_vec[ix] = alpha			
-			mask_t = mask_t.unsqueeze(1) # batch x 1
-			r_t = (mask_t.expand(*r_t.size()) * r_t) + ((1. - mask_t.expand(*r_t.size())) * (r_tm1))
+			mask_t = mask_t.unsqueeze(1) # batch x 1			
+			r_t = self.mask_mult(r_t, r_tm1, mask_t)
 			r_tm1 = r_t
 
 		return r_t, alpha_vec
@@ -263,7 +272,7 @@ class RTE(nn.Module):
 		loss.backward()
 		self.optimizer.step()
 		
-		_, pred_labels = torch.max(preds, dim=-1)
+		_, pred_labels = torch.max(preds, dim=-1, keepdim = True)
 		y_true = self._get_numpy_array_from_variable(y_batch)
 		y_pred = self._get_numpy_array_from_variable(pred_labels)
 		acc = accuracy_score(y_true, y_pred)
@@ -312,7 +321,7 @@ class RTE(nn.Module):
 			p_batch, h_batch = self.process_batch(X[ix : ix + batch_size])
 			
 			preds_batch = self.__call__(p_batch, h_batch)			
-			_ , preds_ix = torch.max(preds_batch, dim=-1)
+			_ , preds_ix = torch.max(preds_batch, dim=-1, keepdim=True)
 			preds_ix = self._get_numpy_array_from_variable(preds_ix)
 			preds_batch = self._get_numpy_array_from_variable(preds_batch) 			
 			if preds is None:
