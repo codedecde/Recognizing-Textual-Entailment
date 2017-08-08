@@ -6,6 +6,7 @@ import os
     Utility functions
     Taken from keras code : https://keras.io/
 '''
+
 def pad_sequences(sequences, maxlen=None, dtype='int32',
                   padding='pre', truncating='pre', value=0.):
     """Pads each sequence to the same length (length of the longest sequence).
