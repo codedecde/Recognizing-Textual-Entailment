@@ -4,7 +4,7 @@ from collections import Counter
 from nltk.tokenize import TweetTokenizer
 import cPickle as cp
 import io
-
+import pdb
 
 import numpy as np
 
@@ -18,11 +18,12 @@ class Lang(object):
     def __init__(self, name, lowercase=True, tokenizer=None):
         self.name = name
         self.word_count = Counter()
+        self.character_count = Counter()
         self.tokenizer = tokenizer
         self.lowercase = lowercase  # To lowercase all words encountered
         self.embedding_matrix = None
-        self.PAD_TOK_VEC = None
-        self.UNK_TOK_VEC = None
+        self.PAD_TOK_VEC = None        
+        self.UNK_TOK_VEC = None        
 
     def tokenize_sent(self, sentence):
         if self.tokenizer is None:
@@ -35,6 +36,22 @@ class Lang(object):
             if self.lowercase:
                 w = w.lower()
             self.word_count[w] += 1
+            for c in w:
+                self.character_count[c] += 1
+
+    def char_index(self, c):
+        if self.lowercase:
+            c = c.lower()
+        return self.char2ix[c] if c in self.char2ix else len(self.char2ix)
+
+    def char_vocab_size(self):
+        assert len(self.ix2char) == len(self.char2ix), "Index not built using generate_vocab and add_word"
+        return len(self.char2ix)
+
+    def add_char(self, c):
+        assert c not in self.char2ix, "Already present in vocab"
+        self.char2ix[c] = len(self.char2ix)
+        self.ix2char[self.char2ix[c]] = c
 
     def generate_vocab(self):
         vocab = self.word_count.most_common(VOCAB_SIZE)
@@ -42,6 +59,11 @@ class Lang(object):
         for w, _ in vocab:
             self.word2ix[w] = len(self.word2ix)
         self.ix2word = {self.word2ix[w]: w for w in self.word2ix}
+        char_vocab = self.character_count.most_common(VOCAB_SIZE)
+        self.char2ix = {"<PAD>": PAD_TOKEN}
+        for c,_ in char_vocab:
+            self.char2ix[c] = len(self.char2ix)
+        self.ix2char = {self.char2ix[c]:c for c in self.char2ix}
 
     def add_word(self, word, embedding=None):
         assert word not in self.word2ix, "Already present in vocab"
@@ -106,9 +128,9 @@ def build_embedding_matrix_from_gensim(l_en, gensim_model, embedding_dim=300):
 if __name__ == "__main__":
     # ROOT_DIR = "/home/bass/DataDir/RTE/"
     ROOT_DIR = ""
-    DATA_FILE = ROOT_DIR + "data/train.txt"
+    DATA_FILE = ROOT_DIR + "../data/tinyTrain.txt"
     # DATA_FILE ="data/tiny_eng-fra.txt"
     l_en = Lang('en', tokenizer=TweetTokenizer())
-    l_en = build_vocab(DATA_FILE, l_en)
-    save_file_name = ROOT_DIR + 'data/vocab.pkl'
+    l_en = build_vocab(DATA_FILE, l_en)    
+    save_file_name = ROOT_DIR + '../data/vocab_char.pkl'
     l_en.save_file(save_file_name)
