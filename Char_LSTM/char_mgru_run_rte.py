@@ -34,7 +34,6 @@ def get_arguments():
     parser.add_argument('-train_flag', action="store", default="true", dest="train_flag", type=str)
     parser.add_argument('-continue_training', action="store", default="false", dest="continue_training", type=str)
     parser.add_argument('-debug', action="store", default="false", dest="debug", type=str)
-    parser.add_argument('-use_pretrained', action="store", default="false", dest="use_pretrained", type=str)
     args = parser.parse_args(sys.argv[1:])
     # Checks for the boolean flags
     args = check_boolean(args, 'last_nonlinear')
@@ -61,8 +60,7 @@ def get_options(args):
         options['TEST_FILE'] = ROOT_DIR + 'data/test.txt'
 
     # Network Properties
-    options['LAST_NON_LINEAR'] = args.last_nonlinear if hasattr(args, 'last_nonlinear') else False
-    options['USE_PRETRAINED']  = args.use_pretrained if hasattr(args, 'use_pretrained') else False
+    options['LAST_NON_LINEAR'] = args.last_nonlinear if hasattr(args, 'last_nonlinear') else False    
     options['BATCH_SIZE']      = args.batch_size     if hasattr(args, 'batch_size')     else 256
     options['DROPOUT']         = args.dropout        if hasattr(args, 'dropout')        else 0.1
     options['EMBEDDING_DIM']   = args.n_embed        if hasattr(args, 'n_embed')        else 300
@@ -73,8 +71,6 @@ def get_options(args):
     # Build the save string
 
     options['SAVE_PREFIX'] = ROOT_DIR + 'models_char_gru/model'
-    if options['USE_PRETRAINED']:
-        options['SAVE_PREFIX'] += '_USING_PRETRAINED_EMBEDDINGS'
 
     options['SAVE_PREFIX'] += '_EMBEDDING_DIM_%d' % (options['EMBEDDING_DIM'])
     options['SAVE_PREFIX'] += '_HIDDEN_DIM_%d' % (options['HIDDEN_DIM'])
@@ -119,7 +115,6 @@ rte_model = charGRU(l_en, options)
 if options['TRAIN_FLAG']:
     print "MODEL PROPERTIES:\n\tEMBEDDING_DIM : %d\n\tHIDDEN_DIM : %d" % (options['EMBEDDING_DIM'], options['HIDDEN_DIM'])
     print "\tDROPOUT : %.4f\n\tL2 : %.4f\n\tLR : %.4f\n\tLAST_NON_LINEAR : %s" % (options['DROPOUT'], options['L2'], options['LR'], str(options['LAST_NON_LINEAR']))
-    print "\tUSING PRETRAINED EMBEDDINGS : %s" % (str(options['USE_PRETRAINED']))
     print 'LOADING DATA ...'
     X_train, y_train = data_generator(options['TRAIN_FILE'], l_en)
     X_val, y_val = data_generator(options['VAL_FILE'], l_en)
@@ -127,7 +122,7 @@ if options['TRAIN_FLAG']:
     if options['CONTINUE_TRAINING']:
         best_model_file = get_best_model_file(options['SAVE_PREFIX'], model_suffix='.model')
         best_model_state = torch.load(best_model_file)
-        rte_model.load_state_dict(best_model_state)       
+        rte_model.load_state_dict(best_model_state)
     rte_model.fit(X_train, y_train, X_val, y_val, n_epochs=200)
 else:
     best_model_file = get_best_model_file(options['SAVE_PREFIX'], model_suffix='.model')

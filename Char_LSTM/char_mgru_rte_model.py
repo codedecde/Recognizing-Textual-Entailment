@@ -15,7 +15,7 @@ PAD_TOKEN = 0
 
 
 class charGRU(nn.Module):
-    def __init__(self, l_en, options):        
+    def __init__(self, l_en, options):
         super(charGRU, self).__init__()
         self.options = options
         self.l_en = l_en
@@ -196,7 +196,7 @@ class charGRU(nn.Module):
 
         # Processing the character level lstms
         premise_char = premise.view(batch_size * sent_len_p, premise.size(2))  # (batch * T) x W
-        hypothesis_char = hypothesis.view(batch_size * sent_len_h, hypothesis.size(2)) # (batch * T) x W
+        hypothesis_char = hypothesis.view(batch_size * sent_len_h, hypothesis.size(2))  # (batch * T) x W
 
         mask_char_p = torch.ne(premise_char, 0).type(dtype)  # (batch * T) x W
         mask_char_p = mask_char_p.transpose(1, 0)  # W x (batch * T)
@@ -206,21 +206,21 @@ class charGRU(nn.Module):
         encoded_char_p = F.dropout(encoded_char_p, p=self.options['DROPOUT'], training=training)
         p_0 = self.character_hidden(encoded_char_p.size(0))  # 1 x (batch*T) x n_embed
         encoded_char_p = encoded_char_p.transpose(1, 0)  # W x (batch * T) x n_embed
-        
+
         encoded_char_h = self.embedding(hypothesis_char)  # (batch * T) x W x n_embed
         encoded_char_h = F.dropout(encoded_char_h, p=self.options['DROPOUT'], training=training)
         h_0 = self.character_hidden(encoded_char_h.size(0))  # 1 x (batch*T) x n_embed
-        encoded_char_h = encoded_char_h.transpose(1, 0)  # W x (batch * T) x n_embed        
+        encoded_char_h = encoded_char_h.transpose(1, 0)  # W x (batch * T) x n_embed
 
         sent_p, _ = self._gru_forward(self.c_gru, encoded_char_p, mask_char_p, p_0)  # W x (batch*T) x n_embed
         sent_h, _ = self._gru_forward(self.c_gru, encoded_char_h, mask_char_h, h_0)  # W x (batch*T) x n_embed
-        
+
         sent_p = sent_p[-1].view(batch_size, sent_len_p, -1)  # batch x T x n_embed
-        sent_h = sent_h[-1].view(batch_size, sent_len_h, -1)  # batch x T x n_embed                
+        sent_h = sent_h[-1].view(batch_size, sent_len_h, -1)  # batch x T x n_embed
 
         encoded_p = sent_p.transpose(1, 0)  # T x batch x n_embed
         encoded_h = sent_h.transpose(1, 0)  # T x batch x n_embed
-        # Processing the masks        
+        # Processing the masks
         mask_p = self._process_mask(mask_char_p.transpose(1, 0), batch_size, sent_len_p)  # batch x T
         mask_h = self._process_mask(mask_char_h.transpose(1, 0), batch_size, sent_len_h)  # batch x T
 
@@ -278,7 +278,7 @@ class charGRU(nn.Module):
             X_batch : [(premise), (hypothesis)]
             y_batch : [label] or None (for predictions)
         '''
-        def get_batch_row(l_en, sentence, max_sent_len, max_word_len ):
+        def get_batch_row(l_en, sentence, max_sent_len, max_word_len):
             ret_val = []
             for ix in xrange(min(len(sentence), max_sent_len)):
                 w = sentence[ix]
@@ -287,7 +287,7 @@ class charGRU(nn.Module):
                     _c.append(l_en.char_index(w[jx]))
                 _c += [PAD_TOKEN for _ in xrange(max_word_len - len(w))]
                 ret_val.append(_c)
-            ret_val += [[PAD_TOKEN for _ in xrange(max_word_len)] for _ in xrange(max_sent_len - len(sentence)) ]
+            ret_val += [[PAD_TOKEN for _ in xrange(max_word_len)] for _ in xrange(max_sent_len - len(sentence))]
             return ret_val
 
         p, h = [list(x) for x in zip(*X_batch)]
@@ -300,11 +300,11 @@ class charGRU(nn.Module):
         y_vec = []
         for ix in xrange(len(p)):
             p_ix = get_batch_row(self.l_en, p[ix], max_len_p, max_word_len_p)
-            h_ix = get_batch_row(self.l_en, h[ix], max_len_h, max_word_len_h)            
+            h_ix = get_batch_row(self.l_en, h[ix], max_len_h, max_word_len_h)
             p_vec.append(p_ix)
             h_vec.append(h_ix)
             if y_batch is not None:
-                y_vec.append(self.options['CLASSES_2_IX'][y_batch[ix]])        
+                y_vec.append(self.options['CLASSES_2_IX'][y_batch[ix]])
         p_vec = np.array(p_vec, dtype=long)
         h_vec = np.array(h_vec, dtype=long)
         p_vec = Variable(torch.LongTensor(p_vec)).cuda() if use_cuda else Variable(torch.LongTensor(p_vec))
